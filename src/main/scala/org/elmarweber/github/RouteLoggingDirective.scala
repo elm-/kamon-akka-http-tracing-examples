@@ -13,6 +13,8 @@ import kamon.trace.Tracer
 import scala.util.Random
 
 trait RouteLoggingDirective extends BasicDirectives {
+  import RouteLoggingDirective._
+  
   private val randomSeed = Random.nextInt(100000)
 
   private val requestIdCounter = new AtomicLong(1)
@@ -21,20 +23,26 @@ trait RouteLoggingDirective extends BasicDirectives {
   def trace: Directive0 =
     extractRequestContext.flatMap { ctx ⇒
       val traceId = s"req-$randomSeed-${requestIdCounter.getAndIncrement()}-${additionalTraceId}"
-      println(traceId + " done")
-
-      val traceCtx = Kamon.tracer.newContext(ctx.request.uri.path.toString, Some(traceId))
-      Tracer.setCurrentContext(traceCtx)
-      ctx.request.headers.find(_.name == "tbd").foreach { header =>
-        Tracer.currentContext.addMetadata("parentToken", header.value)
+      val spanBuilder = Kamon.tracer.buildSpan(ctx.request.uri.path.toString)
+      spanBuilder.withTag("myTraceId", traceId)
+      ctx.request.headers.find(_.name == TraceIdHeader).foreach { header =>
+        spanBuilder.withTag("traceId", header.value)
       }
+      ctx.request.headers.find(_.name == ParentSpanIdHeader).foreach { header =>
+        spanBuilder.withTag("parentId", header.value)
+      }
+      val activeSpan = spanBuilder.startActive()
       mapRouteResult { result ⇒
-        traceCtx.finish()
+        activeSpan.close()
         //val responseWithTraceHeader = response.copy(headers = RawHeader(KamonTraceRest.PublicHeaderName, traceId) :: response.headers)
-        Tracer.clearCurrentContext
         println(traceId + " done")
         result
       }
     }
+}
+
+object RouteLoggingDirective {
+  val TraceIdHeader = "X─B3─TraceId"
+  val ParentSpanIdHeader = "X─B3─ParentSpanId"
 }
 

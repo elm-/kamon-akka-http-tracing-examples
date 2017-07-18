@@ -20,6 +20,17 @@ trait ServiceRoute extends Directives with DefaultJsonProtocol with RouteLogging
             }
           }
         }
+      } ~
+      pathPrefix("echo-sub") {
+        pathEndOrSingleSlash {
+          get {
+            parameter("msg".as[String].?) { msg =>
+              complete {
+                HttpEntity(ContentTypes.`text/plain(UTF-8)`, msg.getOrElse("OK"))
+              }
+            }
+          }
+        }
       }
     }
   }

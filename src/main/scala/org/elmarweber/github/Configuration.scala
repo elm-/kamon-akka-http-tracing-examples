@@ -2,7 +2,7 @@ package org.elmarweber.github
 
 import com.typesafe.config.ConfigFactory
 
-object Config {
+object Configuration {
   private val rootConfig = ConfigFactory.load()
 
   object service {
