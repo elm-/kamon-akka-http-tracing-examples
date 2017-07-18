@@ -28,6 +28,7 @@ libraryDependencies ++= {
     "io.kamon"          %% "kamon-akka-2.4" % "1.0.0-RC1-5472bca942c01bb87720263b36978cc0b243365e",
     "io.kamon"          %% "kamon-jaeger" % "1.0.0-RC1-6cbd74406aac0bedc20746abc78f27e566de1f90",
     "com.typesafe.scala-logging" %% "scala-logging" % "3.7.1",
+    "org.apache.commons" % "commons-lang3" % "3.4",
     "ch.qos.logback" % "logback-classic" % "1.2.3",
     "org.scalatest"     %% "scalatest" % scalaTestV % "test"
   )

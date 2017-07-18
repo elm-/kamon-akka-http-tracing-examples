@@ -1,13 +1,19 @@
 package org.elmarweber.github
 
+import akka.http.scaladsl.client.RequestBuilding
+import akka.http.scaladsl.model.Uri.Query
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.server.Directives
+import org.elmarweber.github.httpclient.HttpClient
 import spray.json._
-
+import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import scala.concurrent.{ExecutionContext, Future}
 
 
-trait ServiceRoute extends Directives with DefaultJsonProtocol with RouteLoggingDirective {
+trait ServiceRoute extends Directives with RouteLoggingDirective {
+  implicit def ec: ExecutionContext
+  implicit def api: EchoSubServiceApi
+  
   val serviceRoute = pathPrefix("api") {
     trace {
       pathPrefix("echo") {
@@ -15,7 +21,18 @@ trait ServiceRoute extends Directives with DefaultJsonProtocol with RouteLogging
           get {
             parameter("msg".as[String].?) { msg =>
               complete {
-                HttpEntity(ContentTypes.`text/plain(UTF-8)`, msg.getOrElse("OK"))
+                EchoResponse(msg.getOrElse("OK"))
+              }
+            }
+          }
+        }
+      } ~
+      pathPrefix("echo-via-sub") {
+        pathEndOrSingleSlash {
+          get {
+            parameter("msg".as[String].?) { msg =>
+              complete {
+                EchoService.doEchoSub(msg)
               }
             }
           }
@@ -26,7 +43,7 @@ trait ServiceRoute extends Directives with DefaultJsonProtocol with RouteLogging
           get {
             parameter("msg".as[String].?) { msg =>
               complete {
-                HttpEntity(ContentTypes.`text/plain(UTF-8)`, msg.getOrElse("OK"))
+                EchoResponse("sub: " + msg.getOrElse("OK"))
               }
             }
           }
@@ -36,12 +53,29 @@ trait ServiceRoute extends Directives with DefaultJsonProtocol with RouteLogging
   }
 }
 
+trait EchoSubServiceApi {
+  def echoSub(msg: Option[String]): Future[EchoResponse]
+}
 
-trait EchoService {
-  def doEcho(msg: Option[String])(implicit ec: ExecutionContext): Unit = {
-    Future {
-      Thread.sleep(500)
-      msg.getOrElse("OK")
-    }
+class EchoSubServiceHttpClient(client: HttpClient) extends EchoSubServiceApi {
+  override def echoSub(msg: Option[String]): Future[EchoResponse] = {
+    val req = RequestBuilding.Get(Uri("/api/echo-sub").withQuery(Query("msg" -> msg.getOrElse(""))))
+    client.doTypedRest[EchoResponse](req)
   }
 }
+
+
+trait EchoService {
+  def doEchoSleepy(msg: Option[String])(implicit ec: ExecutionContext): Future[EchoResponse] = {
+    Future {
+      Thread.sleep(500)
+      EchoResponse(msg.getOrElse("OK"))
+    }
+  }
+
+  def doEchoSub(msg: Option[String])(implicit ec: ExecutionContext, api: EchoSubServiceApi): Future[EchoResponse] = {
+    api.echoSub(msg).map(subMsg => subMsg.copy(echo = subMsg.echo + " (via)"))
+  }
+}
+
+object EchoService extends EchoService
